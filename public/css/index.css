@@ -1,0 +1,9 @@
+:root{
+    --primary-color: #1CD75F;
+    --primary-text-color: #F3FCF4;
+    --tertiary-text-color: #3D4A3E;
+}
+
+h1{
+    color: var(--primary-text-color);
+}
