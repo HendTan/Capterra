@@ -26,7 +26,7 @@
             <button class="actionBtn signupAction">REGISTER</button>
         </div>
         <div class="login">
-            <form action="" method="post">
+            <form action="{{ route("login") }}" method="post">
                 @csrf
                 <div class="input-group flex-nowrap">
                     <span class="input-group-text" id="addon-wrapping"><i class="bi bi-person"></i></span>
@@ -124,6 +124,15 @@
 @section("script")
     <script>
         $(function(){
+            $(".loginBtn").on("click", function(e){
+                e.preventDefault();
+                if($(this).html() === "Login"){
+                    $(".login form").submit();
+                }else if($(this).html() === "Sign up"){
+                    $(".register form").submit();
+                }
+            })
+
             if(window.location.pathname === "/login"){
                 $(".login, .loginAction").addClass("active");
             }else{
@@ -148,9 +157,11 @@
                 if($(this).html() === "LOGIN"){
                     $(".login").addClass("active");
                     $(".register").removeClass("active");
+                    window.location.pathname = "login";
                 }else if($(this).html() === "REGISTER"){
                     $(".register").addClass("active");
                     $(".login").removeClass("active");
+                    window.location.pathname = "signup";
                 }
             })
         })

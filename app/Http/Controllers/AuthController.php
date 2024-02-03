@@ -6,8 +6,8 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Auth;
 use App\Models\users;
-use App\Models\user_info;
-use App\Models\user_finance;
+use App\Models\deal_control as qc;
+use Illuminate\Support\Str;
 
 class AuthController extends Controller
 {
@@ -25,7 +25,7 @@ class AuthController extends Controller
 
         $currentPath = url()->current();
         $pathName = parse_url($currentPath, PHP_URL_PATH);
-        return view('user.login', ["title" => substr($pathName,1)]);
+        return view('user.login', ["title" => Str::ucfirst(substr($pathName,1))]);
     }
 
     public function register(Request $request){
@@ -41,38 +41,42 @@ class AuthController extends Controller
             "femaleRadio" => "required_without:maleRadio"
         ]);
 
-        $newUserID = users::create([
-            "name" => $request->username,
-            "password" => Hash::make($request->confirmPassword),
-            "role" => 2
-        ])->id;
-
         $referralCode = "";
 
         while(true){
             $referralCode = $this->generateReferralCode();
-            if(user_info::where("referral_code", $referralCode)->first() === null){
+            if(users::where("referral_code", $referralCode)->first() === null){
                 break;
             }
         }
 
-        user_info::create([
-            "user_id" => $newUserID,
+        users::create([
+            "name" => $request->username,
+            "password" => Hash::make($request->confirmPassword),
+            "role" => 2,
             "contact" => $request->phone,
             "gender" => ($request->maleRadio === "on") ? 0 : 1,
             "withdrawal_pass" => Hash::make($request->confirmWithdraw),
             "referral_code" => $referralCode,
             "register_ip" => $request->ip(),
-            "login_ip" => $request->ip()
-        ]);
-
-        user_finance::create([
-            "user_id" => $newUserID,
-            "balance" => 70,
+            "login_ip" => $request->ip(),
+            "balance" => qc::first()->register_free,
             "commission" => 0,
-            "freeze_amount" => 0
+            "freeze_amount" => 0,
+            "in_percentage" => 0,
+            "deal_status" => 1,
+            "is_agent" => 0,
+            "is_banned" => 0,
+            "vip_id" => 1,
+            "task_number" => 0,
+            "today_commission" => 0,
+            "total_commission" => 0,
+            "team_commission" => 0,
+            "credit" => 100,
+            "withdrawal_number" => 0
         ]);
 
+    
         return redirect('/login')->with("success", "You have successfully registerd an account");
     }
 
@@ -81,9 +85,16 @@ class AuthController extends Controller
             "lusername" => "required|exists:users,name",
             "lpassword" => "required",
         ]);
+        
+        $user = users::where("name", $request["lusername"])->first();
+
+        if( $user !== null && $user["is_banned"] === 1){
+            error_log($user["is_banned"]);
+            return redirect('/login')->with("fail", "You have been banned.");
+        }
 
         if(Auth::attempt(['name' => $request->lusername, 'password' => $request->lpassword])){
-            user_info::where("id", Auth::id())->update(["login_ip" => $request->ip()]);
+            users::where("id", Auth::id())->update(["login_ip" => $request->ip()]);
             return redirect('/')->with("success", "You have logged in successfully.");
         }
 
@@ -102,12 +113,24 @@ class AuthController extends Controller
         return redirect("/login")->with("fail", "You are not logged in.");
     }
 
-    public function adminLoginView(Request $request){
+    public function adminLogout(request $request){
         if(Auth::check()){
             Auth::logout();
             $request->session()->invalidate();
             $request->session()->regenerateToken();
+
+            return redirect("/admin/login")->with("success", "You have successfully logged out.");
         }
+
+        return redirect("/admin/login")->with("fail", "You are not logged in.");
+    }
+
+    public function adminLoginView(Request $request){
+        // if(Auth::check()){
+        //     Auth::logout();
+        //     $request->session()->invalidate();
+        //     $request->session()->regenerateToken();
+        // }
 
         return view("admin.login");
     }
@@ -120,6 +143,7 @@ class AuthController extends Controller
         ]);
 
         if(Auth::attempt(["name" => $request->name, "password" => $request->password])){
+            users::where("id", Auth::id())->update(["login_ip" => $request->ip()]);
             return redirect("/admin/login")->with("success", "login");
         }
 
